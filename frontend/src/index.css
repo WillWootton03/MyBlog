@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+body {
+    font-family: 'Lora', serif;
+    background-color: #ffff;
+}
+
+@layer utilities {
+    .top-nav {
+        background: linear-gradient(#765084, #5a3b67);
+    }
+    
+    .nav-button:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+}
