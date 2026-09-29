@@ -13,4 +13,12 @@ body {
     .nav-button:hover {
         background: rgba(255, 255, 255, 0.1);
     }
+
+    .background-img {
+        background-image: url('../public/CookedDevBlog.jpg');
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: cover;
+        background-attachment: fixed;
+    }
 }

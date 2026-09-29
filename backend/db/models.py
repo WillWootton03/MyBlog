@@ -1,8 +1,8 @@
 import uuid
 
-from typing import List
+from typing import List, Optional
 
-from sqlalchemy import Date, ForeignKey, LargeBinary, String, Uuid, text, func
+from sqlalchemy import ForeignKey, String, Uuid, func, DateTime
 from sqlalchemy.orm import declarative_base, Mapped, mapped_column, relationship
 
 from datetime import datetime
@@ -14,8 +14,8 @@ Base = declarative_base()
 class Post(Base):
     __tablename__ = 'posts'
 
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, server_default=text("gen_random_uuid()"))
-    date: Mapped[datetime] = mapped_column(Date)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     link: Mapped[str] = mapped_column(String)
     title: Mapped[str] = mapped_column(String)
     body: Mapped[str] = mapped_column(String)
@@ -28,7 +28,7 @@ class Tag(Base):
     __tablename__ = 'tags'
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    posts: Mapped[List["Post"]] = relationship(back_populates='tag')
+    posts: Mapped[List["Post"]] = relationship(back_populates='tag', cascade='all, delete-orphan')
 
 class Status(Base):
     __tablename__ = 'statuses'
@@ -36,10 +36,19 @@ class Status(Base):
     title: Mapped[str] = mapped_column(String, primary_key=True)
     body: Mapped[str] = mapped_column(String)
 
+class Link(Base):
+    __tablename__ = 'links'
+
+    display: Mapped[str] = mapped_column(String, primary_key=True)
+    external_link: Mapped[str] = mapped_column(String)
+
+
 class Details(Base):
     __tablename__ = 'details'
 
-    image_data: Mapped[bytes] = mapped_column(LargeBinary)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+
+    image_data: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     bio: Mapped[str] = mapped_column(String)
     email: Mapped[str] = mapped_column(String)
-    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())

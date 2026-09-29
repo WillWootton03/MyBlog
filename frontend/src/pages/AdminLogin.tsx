@@ -1,10 +1,12 @@
 import { useState } from "react"
 import { useNavigate } from "react-router";
+import { useMain } from "../contexts/MainContext";
 
 export default function AdminLogin() {
     const apiUrl = import.meta.env.VITE_API_URL;    
 
     const navigate = useNavigate();
+    const { setKey } = useMain();
 
     const [password, setPassword] = useState('');
 
@@ -25,10 +27,11 @@ export default function AdminLogin() {
             } 
 
             const data = await res.json();
-            const key = data.admin_key;
+            const admin_key = data.admin_key;
 
-            if (key) {
-                navigate('/', { state: { adminKey: key}});
+            if (admin_key) {
+                setKey(admin_key);
+                navigate('/');
             }
 
         } catch {
