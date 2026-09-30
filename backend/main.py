@@ -1,23 +1,20 @@
-from calendar import month
-from itertools import count
-from sqlite3 import Date
 import uuid
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 
-from click import group
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from sqlalchemy import extract, select, func, cast
+from sqlalchemy import extract, select, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from db.models import Base, Link, Post, Tag, Status, Details
-from db.config import get_db, engine
+from db.config import get_db, engine, s3, S3_BUCKET
 from schemas.schemas import LinksModel, PostModel, TagModel, StatusModel, DetailsModel, UpdateLinkModel, CreatePostResponse
 
 Base.metadata.create_all(bind=engine)
@@ -44,32 +41,43 @@ async def verify_admin_key(req: Request, call_next):
 
     return await call_next(req)
 
-UPLOAD_DIR = '/app/uploaded_images'
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount('/images', StaticFiles(directory=UPLOAD_DIR), name='images')
+# Used for dev image storage
+if os.getenv('ENVIRONMENT') == 'development':
+    UPLOAD_DIR = '/app/uploaded_images'
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    app.mount('/images', StaticFiles(directory=UPLOAD_DIR), name='images')
 
         
 PAGE_SIZE = 5
 
 @app.get('/posts')
-async def all_posts(page: int = Query(1, ge=1), db: Session = Depends(get_db)):
+async def all_posts(page: int = Query(1, ge=1), month: int | None = Query(None, ge=1, le=12), year: int | None = Query(None, ge=2003),  db: Session = Depends(get_db)):
     offset = (page - 1) * PAGE_SIZE
 
-    stmt = select(Post).order_by(Post.date.desc()).limit(PAGE_SIZE).offset(offset)
-    res = db.scalars(stmt).all()
+    stmt = select(Post)
 
-    if not res:
+    if month and year:
+        start = datetime(year, month, 1, tzinfo=timezone.utc)
+
+        if month == 12:
+            end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            end = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+
+        stmt = stmt.where(Post.date >= start, Post.date < end)
+
+    stmt = stmt.order_by(Post.date.desc()).limit(PAGE_SIZE).offset(offset)
+    posts = db.scalars(stmt).all()
+
+    if not posts:
         raise HTTPException(
             status_code=404,
             detail='No Posts found'
         )
 
-    return res
+    return posts
 
-@app.get('/posts/dates')
-async def posts_date(db: Session = Depends(get_db)):
-    stmt = select(func.strftime("%Y-%m", Post.date).label('month_year'), func.count(Post.id).label('post_count')).group_by(func.strftime('%Y-%m', Post.date)).order_by('month_year')
-    res = db.execute(stmt).all()
+
 
 @app.get('/posts/{post_id}', response_model=PostModel)
 async def get_post(post_id: uuid.UUID, db: Session = Depends(get_db)):
@@ -130,21 +138,6 @@ async def get_posts_by_tag(tag_id: str, page: int = Query(1, ge=1), db: Session 
 
     return res
 
-@app.get('/posts')
-async def get_posts_by_date(month: int = Query(1, ge=1, le=12), year: int = Query(2003, ge=2003), page: int = Query(1, ge=1), db: Session = Depends(get_db)):
-    offset = (page - 1) * PAGE_SIZE
-
-    start = datetime(year, month, 1, tzinfo=timezone.utc)
-
-    if month == 12:
-        end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
-    else:
-        end = datetime(year, month + 1, 1, tzinfo=timezone.utc)
-
-    posts = db.scalars(select(Post).where(Post.date >= start, Post.date < end).order_by(Post.date.desc()).limit(PAGE_SIZE).offset(offset)).all()
-
-    return posts
-
 @app.get('/tags')
 async def get_all_tags(db: Session = Depends(get_db)):
     stmt = select(Tag)
@@ -179,7 +172,17 @@ async def get_details(db: Session = Depends(get_db)):
             status_code=404,
             detail='No details found'
         )
-    print(res.image_data)
+
+    if res.image_data and os.getenv('ENVIRONMENT') != 'development':
+        res.image_data = s3.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': S3_BUCKET,
+                'Key': res.image_data,
+            },
+            ExpiresIn=3600,
+        )
+
     return res
 
 @app.get('/links')
@@ -223,15 +226,31 @@ async def update_details(file: UploadFile = File(None), bio: str = Form(''), ema
                 detail='File must be an image' 
             )
 
-        safe_title = f"{str(file.filename).replace(' ', '_')}"
-        file_path = os.path.join(UPLOAD_DIR, safe_title)
+        if os.getenv('ENVIRONMENT') == 'development': 
+            safe_title = str(file.filename).replace(' ', '_')
+            file_path = os.path.join(UPLOAD_DIR, safe_title)
 
-        file_byes = await file.read()
+            file_byes = await file.read()
 
-        with open(file_path, 'wb') as buffer:
-            buffer.write(file_byes)
+            with open(file_path, 'wb') as buffer:
+                buffer.write(file_byes)
 
-        image_url = f'/images/{safe_title}'
+            image_url = f'/images/{safe_title}'
+        else: 
+            extension = Path(file.filename or "").suffix
+            safe_title = f"{uuid.uuid4()}{extension}"
+
+            file_bytes = await file.read()
+
+            s3.put_object(
+                Bucket=S3_BUCKET,
+                Key=f'media/{safe_title}',
+                Body=file_bytes,
+                ContentType=file.content_type,
+            )
+
+            image_url = f"https://{S3_BUCKET}.s3.amazonaws.com/media/{safe_title}"
+
         db_item.image_data = image_url
 
     if bio != '':
@@ -386,7 +405,6 @@ async def create_post(payload: NewPostModel, db: Session = Depends(get_db)):
                 status_code=400,
                 detail='Failed to create new tag',
             )
-
     db_post = Post(
         date=datetime.now(timezone.utc),
         link=payload.link,
@@ -460,3 +478,8 @@ async def delete_link(link_id: str, db: Session = Depends(get_db)):
     db.commit() 
 
     return None
+
+
+# AWS Lambda handler
+from mangum import Mangum
+handler = Mangum(app)

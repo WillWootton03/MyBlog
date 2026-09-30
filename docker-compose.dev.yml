@@ -6,9 +6,9 @@ services:
     ports:
     - "8000:8000"
     volumes:
-      - sqlite_data:/data
       - ./backend:/app
       - post_images:/app/uploaded_images
+      - ${USERPROFILE}/.aws:/root/.aws:ro
     restart: on-failure
     env_file:
       - ./backend/.env
@@ -31,5 +31,4 @@ services:
 
 
 volumes:
-  sqlite_data:
   post_images:

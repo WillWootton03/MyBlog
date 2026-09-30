@@ -28,7 +28,7 @@ export default function Post({
                 <p className="">{formatted_date}</p>
                 {key ? (
                     <button
-                        onClick={() => deletePost(id)}
+                        onClick={() => deletePost(id, date)}
                         className="px-1 hover:bg-black/10 hover:text-red-500 cursor-pointer"
                     >
                         Delete

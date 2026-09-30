@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMain, type TagData } from "../contexts/MainContext";
+import { useMain } from "../contexts/MainContext";
 import AdminPostPreview from "../pages/AdminPostPreview";
 
 interface NewPostModalProps {

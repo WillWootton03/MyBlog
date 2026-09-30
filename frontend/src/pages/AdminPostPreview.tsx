@@ -1,5 +1,4 @@
 import Post from "../components/Post";
-import type { TagData } from "../contexts/MainContext";
 
 interface AdminPostPreviewProps {
     title: string;
@@ -9,7 +8,7 @@ interface AdminPostPreviewProps {
 }
 
 
-const now = Date.now();
+const now = new Date;
 
 export default function AdminPostPreview({
     title,
@@ -22,7 +21,7 @@ export default function AdminPostPreview({
             <Post
                 key={''} 
                 id={''}
-                date={now.toString()}
+                date={now}
                 link={video_id}
                 title={title}
                 body={body}

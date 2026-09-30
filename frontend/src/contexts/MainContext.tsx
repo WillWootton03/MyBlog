@@ -48,6 +48,10 @@ interface MainContextType {
     page: number;
     currentTag: string;
     postsInfo: PostInfo[],
+    currentMonth: number | null;
+    currentYear: number | null;
+    setCurrentMonth: Dispatch<SetStateAction<number | null>>;
+    setCurrentYear: Dispatch<SetStateAction<number | null>>;
     setPostsInfo: Dispatch<SetStateAction<PostInfo[]>>;
     setCurrentTag: Dispatch<SetStateAction<string>>;
     setPage: Dispatch<SetStateAction<number>>;
@@ -58,12 +62,12 @@ interface MainContextType {
     setEmail: Dispatch<SetStateAction<string>>;
     setImageUrl: Dispatch<SetStateAction<string>>;
     setPosts: Dispatch<SetStateAction<PostData[]>>;
-    getPosts: (current_tag?: string, page?: number) => void;
+    getPosts: (current_tag?: string, inp_page?: number, month?: number, year?: number, reset?: boolean) => void;
     getTags: () => void;
     getStatuses: () => void;
     getDetails: () => void;
     getLinks: () => void;
-    getPostsInfo: (updated?: boolean) => void;
+    getPostsInfo: () => void;
     newTag: (newTagId: string, key?: string) => void;
     updateDetails: (selectedFile: File | null, details: DetailData) => void;
     updateTag: (editingTag: string, editTag: string) => void;
@@ -73,7 +77,7 @@ interface MainContextType {
     updateStatus: (statusId: string, statusTitle: string, statusBody: string) => void;
     deleteStatus: (statusTitle: string) => void;
     createPost: (title: string, link: string, body: string, tag_id: string) => void;
-    deletePost: (id: string) => void;
+    deletePost: (id: string, date: Date) => void;
     updateLink: (id: string, display?: string, external_link?: string) => void;
     deleteLink: (display: string) => void;
     API_URL: string;
@@ -99,6 +103,7 @@ export function MainProvider({ children }: { children: ReactNode }) {
 
     const [currentTag, setCurrentTag] = useState('');
     const [currentMonth, setCurrentMonth] = useState<number | null>(null);
+    const [currentYear, setCurrentYear] = useState<number | null>(null);
 
     const [key, setKey] = useState('');
 
@@ -109,21 +114,47 @@ export function MainProvider({ children }: { children: ReactNode }) {
 
     const API_URL = import.meta.env.VITE_API_URL;
 
-    function getPostsByPage(page: number, inp_posts?: PostData[]) {
-        return inp_posts ? inp_posts.slice(((page - 1) * PAGE_SIZE), page * PAGE_SIZE) : posts.slice(((page - 1) * PAGE_SIZE), page * PAGE_SIZE);
+    function removeTagPages(tag_id: string) {
+        let count = 1;
+        let clear_all = false;  
+        while (true) {
+            const tag_cache_key = `posts_t${tag_id}_p${count}`;
+            const all_cache_key = `posts_p${count}`;
+
+            const cached__tag_posts = sessionStorage.getItem(tag_cache_key);
+            const cached_all_posts = sessionStorage.getItem(`posts_p${count}`);
+
+            if (cached__tag_posts) {
+                sessionStorage.removeItem(tag_cache_key);
+            }
+            if (cached_all_posts) {
+                if (clear_all) {
+                    sessionStorage.removeItem(all_cache_key);
+                } else {
+                    let parsed_posts = JSON.parse(cached_all_posts) as PostData[];
+                    parsed_posts = parsed_posts.filter((post: PostData) => post.tag_id !== tag_id);
+                    if (parsed_posts.length < 5)  {
+                        sessionStorage.removeItem(all_cache_key);
+                        clear_all = true;
+                    }
+                }
+            }
+            if (!cached__tag_posts && !cached_all_posts) {
+                break;
+            }  
+            ++count;
+        }   
+        return;
     }
 
-    // set updated to true if want to reload data, when posts created or deleted
-    async function getPostsInfo(updated: boolean = false) {
-        if (!updated) {
-            const cached_info = sessionStorage.getItem('posts_info')
-            if (cached_info ) {
-                try {
-                    const post_info = JSON.parse(cached_info)
-                    setPostsInfo(post_info);
-                } catch {
-                    console.error('Failed to retrieve cached posts');
-                }
+    async function getPostsInfo() {
+        const cached_info = sessionStorage.getItem('posts_info')
+        if (cached_info ) {
+            try {
+                const post_info = JSON.parse(cached_info)
+                setPostsInfo(post_info);
+            } catch {
+                console.error('Failed to retrieve cached posts');
             }
         } else {
             const res = await fetch(`${API_URL}/info/posts`);
@@ -136,34 +167,50 @@ export function MainProvider({ children }: { children: ReactNode }) {
         }
     }
 
+    async function getPosts(current_tag?: string, inp_page?: number, month?: number, year?:number, reset?: boolean) {
+        let cached_posts;
+        let cache_key;
 
-    async function getPosts(current_tag?: string, inp_page?: number, month?: number, year?:number) {
-        const cached_posts = sessionStorage.getItem('posts')
-        if (cached_posts) {
-            try {
-                const new_posts = getPostsByPage(page, JSON.parse(cached_posts) as PostData[]);
-                setPosts(new_posts);
-            } catch {
-                console.error('Failed to retrieve cached posts');
-            }
+        const reqMonth = month ?? currentMonth;
+        const reqYear = year ?? currentYear;
+        const reqPage = inp_page ?? page;
+        const reqTag = current_tag;
+
+        if (reset) {
+            cache_key = 'posts_p1';
         }
-        else {
-            let res;
-            if (month && year) {
-                res = await fetch(`${API_URL}/posts?month=${month}&year=${year}`);
+        else if (reqTag) {
+            cache_key = `posts_t${reqTag}_p${reqPage}`
+        } else if (reqMonth && reqYear) {
+            cache_key = `posts_m${month ?? currentMonth}_y${year ?? currentYear}_p${inp_page ?? page}`;
+        } else {
+            cache_key = `posts_p${inp_page ?? page}`
+        } 
+            cached_posts = sessionStorage.getItem(cache_key);
+            if (cached_posts) {
+                try {
+                    cached_posts = JSON.parse(cached_posts) as PostData[];
+                    setPosts(cached_posts);
+                } catch {
+                    console.error('Failed to retrieve cached posts');
+                }
             } else {
-                // if state current tag use that else check if we pass in current tg, else just get normal page
-                res = currentTag === '' 
-                    ? current_tag 
-                        ? await fetch(`${API_URL}/posts/tags/${current_tag}?page=${inp_page ? inp_page : page}`) 
-                        : await fetch(`${API_URL}/posts?page=${inp_page ? inp_page : page}`)
-                    : await fetch(`${API_URL}/posts/tags/${currentTag}?page=${inp_page ? inp_page : page}`);
+            let res;
+            // Fetches posts by degree of importance with reset being top prio, then tag seach, and finally month search
+            if (reset) {
+                res = await fetch(`${API_URL}/posts?page=1`);
+            } else if (current_tag) {
+                res = await fetch(`${API_URL}/posts/tags/${reqTag}?page=${reqPage}`) 
+            } else if (reqMonth && reqYear) {
+                res = await fetch(`${API_URL}/posts?month=${reqMonth}&year=${reqYear}&page=${reqPage}`);
+            } else {
+                res = await fetch(`${API_URL}/posts?page=${reqPage}`)
             }
+
             if (res.ok) {
                 const new_posts = await res.json() as PostData[];
                 setPosts(new_posts);
-                sessionStorage.setItem('posts', JSON.stringify(new_posts));
-                getPostsInfo();
+                sessionStorage.setItem(cache_key, JSON.stringify(new_posts));
             } else {
                 setPosts([])
             }
@@ -294,8 +341,7 @@ export function MainProvider({ children }: { children: ReactNode }) {
             });
             if (res.ok) {
                 const data = await res.json();
-                const new_post = data.post;
-                console.log(data);
+                const new_post = data.post as PostData;
                 if (data.tag) {
                     console.log(data.tag);
                     const new_tag = data.tag as TagData;
@@ -303,18 +349,36 @@ export function MainProvider({ children }: { children: ReactNode }) {
                     sessionStorage.setItem('tags', JSON.stringify(new_tags));
                     setTags(new_tags);
                 }
-                const cached_posts = sessionStorage.getItem('posts');
+                await getPosts();
 
-                const all_posts = cached_posts
-                    ? JSON.parse(cached_posts) as PostData[]
-                    : posts;
+                const new_date = new Date(new_post.date);
+                setPostsInfo(prev => {
+                    const month = new_date.getUTCMonth() + 1;
+                    const year = new_date.getUTCFullYear();
 
-                    const new_posts = [new_post, ...all_posts];
+                    if (prev.length === 0) {
+                        const new_posts_info = [{ month, year, count: 1}] as PostInfo[];
+                        sessionStorage.setItem('posts_info', JSON.stringify(new_posts_info));
+                        return new_posts_info;
+                    }
 
-                    sessionStorage.setItem('posts', JSON.stringify(new_posts));
-                    setPosts(getPostsByPage(page, new_posts));
+                    let found = false;
+
+                    const new_posts_info = prev.map(item => {
+                        if (item.month === month && item.year === year) {
+                            found = true;
+                            return {...item, count: item.count + 1};
+                        }
+                        return item;
+                    });
+
+                    if (!found) {
+                        new_posts_info.push({month, year, count: 1});
+                    }
+                    sessionStorage.setItem('posts_info', JSON.stringify(new_posts_info));
+                    return new_posts_info;
+                });
             }
-            getPostsInfo(true);
         }
     }
         
@@ -417,18 +481,15 @@ export function MainProvider({ children }: { children: ReactNode }) {
                     const new_tags = tags.filter((item) => item.id != tag)
                     setTags(new_tags);
                     sessionStorage.setItem('tags', JSON.stringify(new_tags));
-                    const cached_posts = sessionStorage.getItem('posts');
-                    const all_posts = cached_posts ? JSON.parse(cached_posts) as PostData[] : posts;
-                    const new_posts = all_posts.filter(item => item.tag_id != tag);
-                    sessionStorage.setItem('posts', JSON.stringify(new_posts));
-                    setPosts(new_posts);
+                    await getPosts();
                     console.log('Deleted tag');
                 }
-                getPostsInfo(true);
+                removeTagPages(tag);
+                getPostsInfo();
             }
         }
 
-        async function deletePost(id: string) {
+        async function deletePost(id: string, date: Date) {
             if (key) {
                 const res = await fetch(`${API_URL}/admin/posts/${id}`, {
                     method: 'DELETE',
@@ -437,19 +498,17 @@ export function MainProvider({ children }: { children: ReactNode }) {
                     },
                 });
                 if (res.ok) {
-                    const cached_posts = sessionStorage.getItem('posts');
-
-                    const all_posts = cached_posts
-                        ? JSON.parse(cached_posts) as PostData[]
-                        : posts
-
-                    const new_posts = all_posts.filter((item) => item.id !== id);
-
-                    sessionStorage.setItem('posts', JSON.stringify(new_posts));
-                    setPosts(getPostsByPage(page, new_posts));
+                    getPosts();
                     console.log('Deleted Post');
                 }
-                getPostsInfo(true);
+                const format_date = new Date(date);
+                const new_posts_info = postsInfo.map(item => item.month === format_date.getUTCMonth() + 1 && item.year === format_date.getUTCFullYear()
+                    ? {...item, count: item.count - 1} 
+                    : item 
+                ).filter(item => item.count > 0);
+
+                setPostsInfo(new_posts_info);
+                sessionStorage.setItem('posts_info', JSON.stringify(new_posts_info));
             }
         }
     
@@ -552,6 +611,10 @@ export function MainProvider({ children }: { children: ReactNode }) {
                 page,
                 currentTag,
                 postsInfo,
+                currentMonth,
+                currentYear,
+                setCurrentMonth,
+                setCurrentYear,
                 getPostsInfo,
                 setPostsInfo,
                 setCurrentTag,

@@ -1,17 +1,21 @@
 import os
+from dotenv import load_dotenv
+import boto3
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-DB_DIR = '/data'
-DB_PATH = f'{DB_DIR}/app.db'
-os.makedirs(DB_DIR, exist_ok=True)
+load_dotenv()
 
-URL = f'sqlite:///{DB_PATH}'
-ARGS = {"check_same_thread": False}
+DATABASE_URL = os.getenv("DATABASE_URL")
 
+if DATABASE_URL is None:
+    raise RuntimeError('DATABASE_URL is not set')
 
-engine = create_engine(URL, connect_args=ARGS)
+engine = create_engine(DATABASE_URL)
+
+s3 = boto3.client('s3')
+S3_BUCKET = os.getenv('S3_BUCKET')
 
 SessionLocal = sessionmaker(
     autocommit=False,

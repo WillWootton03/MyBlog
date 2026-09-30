@@ -5,8 +5,8 @@ import SidbarTags from "./SidebarTags";
 import SidebarLinks from "./SidebarLinks";
 import SidebarMonthlySelect from "./SidebarMonthlySelect";
 
-const PLACEHOLDER_BIO = 'Hello, my name is William welcome to my little corner of the internet. This is a personal project and portfolio where I talk about anything I come across.';
-const PLACEHOLDER_EMAIL = 'wwootton03@gmail.com';
+// const PLACEHOLDER_BIO = 'Hello, my name is William welcome to my little corner of the internet. This is a personal project and portfolio where I talk about anything I come across.';
+// const PLACEHOLDER_EMAIL = 'wwootton03@gmail.com';
 
 export default function Sidebar() {
 
@@ -25,7 +25,7 @@ export default function Sidebar() {
         getTags();
         getStatuses();
         getLinks();
-        getPostsInfo(true);
+        getPostsInfo();
     }, []);
 
 

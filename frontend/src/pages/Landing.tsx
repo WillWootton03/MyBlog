@@ -6,30 +6,36 @@ import { useMain } from "../contexts/MainContext";
 
 export default function Landing() {
 
-    const { posts, page, setPage, key, createPost, getPosts, PAGE_SIZE } = useMain();
+    const { posts, page, setPage, key, createPost, getPosts, PAGE_SIZE, currentMonth, currentYear, postsInfo } = useMain();
     const [displayNewPostModal, setDisplayNewPostModal] = useState(false);
     const [postsLength, setPostsLength] = useState(0);
 
     useEffect(() => {
-        const all_posts = sessionStorage.getItem('posts'); 
-        setPostsLength(all_posts ? JSON.parse(all_posts).length : 0);
-    }, [posts])
+        let posts_count: number = 0;  
+        if (!currentMonth && !currentYear) {
+            postsInfo.forEach(info => posts_count += info.count); 
+        } else {
+            posts_count = postsInfo.find(info => info.month === currentMonth && info.year === currentYear)?.count ?? 0;
+        }
+        setPostsLength(posts_count);
+    }, [posts, currentMonth, currentYear, postsInfo])
+
+
 
     async function handlePostSubmit(title: string, body: string, link: string, tag_id: string) {
         setDisplayNewPostModal(false);
         createPost(title, link, body, tag_id);
-        getPosts();
     }
+
 
     async function handleNewPage(change: number) {
         if (change < 1) {
             setPage(page + change < 1 ? 1 : page + change)
         } else {
-            setPage((page + change - 1) * PAGE_SIZE > posts.length ? page : page + change)
+            setPage((page + change - 1) * PAGE_SIZE > postsLength ? page : page + change)
         }
     }
 
-    // TODO: Fix loading posts logic
     useEffect(() => {
         getPosts();
     }, [page])

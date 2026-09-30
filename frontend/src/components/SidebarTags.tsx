@@ -32,9 +32,9 @@ export default function SidbarTags() {
     }
 
     async function handleGetTaggedPosts(tag_id: string) {
+        getPosts(tag_id, 1);
         setCurrentTag(tag_id);
         setPage(1);
-        getPosts(tag_id, 1);
     }
 
     return (
