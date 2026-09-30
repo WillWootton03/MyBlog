@@ -21,9 +21,17 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+if os.getenv('ENVIRONMENT') == 'development':
+    FRONTEND_URL = 'http://localhost:5173'
+else:
+    FRONTEND_URL = os.environ.get("PROD_FRONTEND") 
+
+if not FRONTEND_URL:
+    FRONTEND_URL = ''
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,7 +61,6 @@ PAGE_SIZE = 5
 @app.get('/posts')
 async def all_posts(page: int = Query(1, ge=1), month: int | None = Query(None, ge=1, le=12), year: int | None = Query(None, ge=2003),  db: Session = Depends(get_db)):
     offset = (page - 1) * PAGE_SIZE
-
     stmt = select(Post)
 
     if month and year:
