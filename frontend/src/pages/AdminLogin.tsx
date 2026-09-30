@@ -3,16 +3,15 @@ import { useNavigate } from "react-router";
 import { useMain } from "../contexts/MainContext";
 
 export default function AdminLogin() {
-    const apiUrl = import.meta.env.VITE_API_URL;    
 
     const navigate = useNavigate();
-    const { setKey } = useMain();
+    const { setKey, API_URL } = useMain();
 
     const [password, setPassword] = useState('');
 
     async function adminLogin() {
         try {
-            const res = await fetch(`${apiUrl}/admin/login`,{
+            const res = await fetch(`${API_URL}/admin/login`,{
                 method: "POST",
                 headers: {
                     'Content-Type': 'application/json',
