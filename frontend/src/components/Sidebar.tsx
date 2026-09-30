@@ -10,7 +10,7 @@ import SidebarMonthlySelect from "./SidebarMonthlySelect";
 
 export default function Sidebar() {
 
-    const { details, initBio, initEmail, imageUrl, API_URL, 
+    const { details, initBio, initEmail, imageUrl, 
         setBio, setEmail, setImageUrl,  getDetails, getStatuses, getTags,
         updateDetails, key, getLinks, getPostsInfo,
     } 
