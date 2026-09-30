@@ -9,6 +9,8 @@ export default function AdminLogin() {
 
     const [password, setPassword] = useState('');
 
+    console.log(API_URL);
+
     async function adminLogin() {
         try {
             const res = await fetch(`${API_URL}/admin/login`,{

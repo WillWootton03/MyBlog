@@ -75,7 +75,7 @@ export default function Sidebar() {
                         />
                         <img 
                             onClick={() => key ? selectNewImage() : null}
-                            className={`border h-full w-full ${key ? 'cursor-pointer' : 'cursor-auto'}`} src={imageUrl.startsWith('blob:') ? imageUrl : `${API_URL}${imageUrl}`} alt="image" 
+                            className={`border h-full w-full ${key ? 'cursor-pointer' : 'cursor-auto'}`} src={imageUrl.startsWith('blob:') ? imageUrl : `${imageUrl}`} alt="image" 
                         />
                     </div>
                     {key ? 

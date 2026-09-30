@@ -289,7 +289,6 @@ export function MainProvider({ children }: { children: ReactNode }) {
 
             if (res.ok) {
                 const all_details = await res.json() as DetailData;
-                console.log(`${all_details.image_data}`);
                 setBio(all_details.bio);
                 setEmail(all_details.email);
                 setImageUrl(all_details.image_data || '');
