@@ -246,17 +246,16 @@ async def update_details(file: UploadFile = File(None), bio: str = Form(''), ema
         else: 
             extension = Path(file.filename or "").suffix
             safe_title = f"{uuid.uuid4()}{extension}"
-
             file_bytes = await file.read()
 
             s3.put_object(
                 Bucket=S3_BUCKET,
-                Key=f'media/{safe_title}',
+                Key=safe_title,
                 Body=file_bytes,
                 ContentType=file.content_type,
             )
 
-            image_url = f"https://{S3_BUCKET}.s3.amazonaws.com/media/{safe_title}"
+            image_url = f"https://{S3_BUCKET}.s3.amazonaws.com/{safe_title}"
 
         db_item.image_data = image_url
 
